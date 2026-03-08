@@ -27,6 +27,14 @@ uvicorn app:app --host 127.0.0.1 --port 8010 --reload
 
 Open: `http://127.0.0.1:8010`
 
+## Deploy on Render
+
+- Runtime: `Python`
+- Build command: `pip install -r requirements.txt`
+- Start command: `python -m uvicorn app:app --host 0.0.0.0 --port $PORT`
+
+This repo includes `render.yaml` with the same settings.
+
 ## Pricing Included
 
 - Delivery within 4 hours: AUD $30
