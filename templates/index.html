@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local Lifts & Deliveries</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Local Lifts & Deliveries</h1>
+    <p>Book online for local deliveries and lifts. Choose a calendar slot and get email confirmation.</p>
+
+    <section class="pricing">
+      <strong>Pricing (AUD)</strong>
+      <ul>
+        <li>Delivery within 4 hours: $30</li>
+        <li>Direct delivery: $60</li>
+        <li>Instant lift: $30</li>
+        <li>Airport (Gold Coast to Brisbane): $60</li>
+      </ul>
+    </section>
+
+    <form id="bookingForm" class="grid">
+      <label>Selected slot
+        <input id="slotDisplay" readonly placeholder="Select an available slot from the calendar" />
+      </label>
+      <input type="hidden" name="preferred_time" id="preferredTime" />
+
+      <label>Full name
+        <input name="full_name" required />
+      </label>
+
+      <label>Email
+        <input type="email" name="email" required />
+      </label>
+
+      <label>Your phone number
+        <input name="phone" required />
+      </label>
+
+      <label>Service type
+        <select name="service_type" required>
+          <option value="delivery_within_4h">Delivery (within 4 hours) - $30</option>
+          <option value="delivery_direct">Delivery (direct) - $60</option>
+          <option value="lift_instant">Instant lift - $30</option>
+          <option value="airport_gc_to_brisbane">Airport (Gold Coast to Brisbane) - $60</option>
+        </select>
+      </label>
+
+      <label>Pickup location
+        <input id="pickupLocation" name="pickup_location" required autocomplete="off" />
+      </label>
+      <input type="hidden" id="pickupPlaceId" name="pickup_place_id" />
+
+      <label>Dropoff location
+        <input id="dropoffLocation" name="dropoff_location" required autocomplete="off" />
+      </label>
+      <input type="hidden" id="dropoffPlaceId" name="dropoff_place_id" />
+
+      <label>Notes (optional)
+        <textarea name="notes" rows="4"></textarea>
+      </label>
+
+      <button type="submit" id="submitBtn">Book Now</button>
+    </form>
+
+    <section class="calendar-wrap">
+      <div class="calendar-header">
+        <h2>Booking Calendar</h2>
+        <div class="day-toggle">
+          <button type="button" id="days7Btn">7 Days</button>
+          <button type="button" id="days14Btn" class="active">14 Days</button>
+        </div>
+      </div>
+      <p class="muted">Available slots are shown below. Click a slot to book it.</p>
+      <div id="calendarGrid" class="calendar-grid"></div>
+    </section>
+
+    <div id="result" class="result" style="display:none"></div>
+    <div id="error" class="error" style="display:none"></div>
+    <p class="phone">Business phone: <span id="bizPhone">0400 000 000</span></p>
+  </main>
+
+  <script>
+    const form = document.getElementById("bookingForm");
+    const calendarGrid = document.getElementById("calendarGrid");
+    const preferredTime = document.getElementById("preferredTime");
+    const slotDisplay = document.getElementById("slotDisplay");
+    const result = document.getElementById("result");
+    const errorBox = document.getElementById("error");
+    const submitBtn = document.getElementById("submitBtn");
+    const bizPhone = document.getElementById("bizPhone");
+    const days7Btn = document.getElementById("days7Btn");
+    const days14Btn = document.getElementById("days14Btn");
+    const pickupInput = document.getElementById("pickupLocation");
+    const dropoffInput = document.getElementById("dropoffLocation");
+    const pickupPlaceId = document.getElementById("pickupPlaceId");
+    const dropoffPlaceId = document.getElementById("dropoffPlaceId");
+
+    let selectedSlot = "";
+    let selectedSlotLabel = "";
+    let currentDays = 14;
+    let mapsReady = false;
+
+    function resetMessages() {
+      result.style.display = "none";
+      errorBox.style.display = "none";
+    }
+
+    function setSelectedSlot(isoTime, label) {
+      selectedSlot = isoTime;
+      selectedSlotLabel = label;
+      preferredTime.value = isoTime;
+      slotDisplay.value = label;
+      document.querySelectorAll(".slot-btn.selected").forEach((n) => n.classList.remove("selected"));
+      const selected = document.querySelector(`button[data-slot="${isoTime}"]`);
+      if (selected) selected.classList.add("selected");
+    }
+
+    async function loadPublicConfig() {
+      try {
+        const response = await fetch("/api/public-config");
+        if (!response.ok) return;
+        const cfg = await response.json();
+        if (cfg.business_phone) {
+          bizPhone.textContent = cfg.business_phone;
+        }
+        if (cfg.google_maps_api_key) {
+          await loadGoogleMaps(cfg.google_maps_api_key);
+          setupAutocomplete();
+        }
+      } catch {
+        // keep defaults
+      }
+    }
+
+    function loadGoogleMaps(apiKey) {
+      if (window.google && window.google.maps && window.google.maps.places) {
+        mapsReady = true;
+        return Promise.resolve();
+      }
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+        script.async = true;
+        script.onload = () => {
+          mapsReady = true;
+          resolve();
+        };
+        script.onerror = () => reject(new Error("Failed to load Google Maps script."));
+        document.head.appendChild(script);
+      });
+    }
+
+    function setupAutocomplete() {
+      if (!mapsReady) return;
+      const opts = {
+        fields: ["formatted_address", "place_id", "name"],
+        componentRestrictions: { country: "au" },
+      };
+      const pickupAC = new google.maps.places.Autocomplete(pickupInput, opts);
+      const dropoffAC = new google.maps.places.Autocomplete(dropoffInput, opts);
+
+      pickupAC.addListener("place_changed", () => {
+        const place = pickupAC.getPlace();
+        if (place.formatted_address) pickupInput.value = place.formatted_address;
+        pickupPlaceId.value = place.place_id || "";
+      });
+      dropoffAC.addListener("place_changed", () => {
+        const place = dropoffAC.getPlace();
+        if (place.formatted_address) dropoffInput.value = place.formatted_address;
+        dropoffPlaceId.value = place.place_id || "";
+      });
+
+      pickupInput.addEventListener("input", () => {
+        pickupPlaceId.value = "";
+      });
+      dropoffInput.addEventListener("input", () => {
+        dropoffPlaceId.value = "";
+      });
+    }
+
+    function renderCalendar(days) {
+      calendarGrid.innerHTML = "";
+      for (const day of days) {
+        const dayCard = document.createElement("div");
+        dayCard.className = "day-card";
+
+        const dayTitle = document.createElement("h3");
+        dayTitle.textContent = day.label;
+        dayCard.appendChild(dayTitle);
+
+        const slotsWrap = document.createElement("div");
+        slotsWrap.className = "slots-wrap";
+        dayCard.appendChild(slotsWrap);
+
+        for (const slot of day.slots) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "slot-btn";
+          btn.textContent = slot.label;
+          btn.dataset.slot = slot.time;
+
+          if (slot.status !== "available") {
+            btn.disabled = true;
+            btn.classList.add(slot.status === "booked" ? "booked" : "past");
+          } else {
+            const label = `${day.label} ${slot.label}`;
+            btn.addEventListener("click", () => setSelectedSlot(slot.time, label));
+          }
+          slotsWrap.appendChild(btn);
+        }
+
+        calendarGrid.appendChild(dayCard);
+      }
+    }
+
+    async function loadAvailability(days) {
+      resetMessages();
+      try {
+        const response = await fetch(`/api/availability?days=${days}`);
+        if (!response.ok) throw new Error("Failed to load availability.");
+        const data = await response.json();
+        renderCalendar(data.days);
+      } catch (error) {
+        errorBox.textContent = error.message || "Failed to load availability.";
+        errorBox.style.display = "block";
+      }
+    }
+
+    days7Btn.addEventListener("click", () => {
+      currentDays = 7;
+      days7Btn.classList.add("active");
+      days14Btn.classList.remove("active");
+      loadAvailability(currentDays);
+    });
+
+    days14Btn.addEventListener("click", () => {
+      currentDays = 14;
+      days14Btn.classList.add("active");
+      days7Btn.classList.remove("active");
+      loadAvailability(currentDays);
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      resetMessages();
+
+      if (!preferredTime.value) {
+        errorBox.textContent = "Please select an available slot from the calendar.";
+        errorBox.style.display = "block";
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Submitting...";
+
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+
+      try {
+        const response = await fetch("/api/bookings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.detail || "Booking failed");
+        }
+
+        const data = await response.json();
+        result.textContent = `${data.message} Price: AUD $${data.price_aud}. Slot: ${selectedSlotLabel}`;
+        result.style.display = "block";
+        form.reset();
+        selectedSlot = "";
+        selectedSlotLabel = "";
+        preferredTime.value = "";
+        slotDisplay.value = "";
+        await loadAvailability(currentDays);
+      } catch (error) {
+        errorBox.textContent = error.message || "Booking failed.";
+        errorBox.style.display = "block";
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Book Now";
+      }
+    });
+
+    loadPublicConfig();
+    loadAvailability(currentDays);
+  </script>
+</body>
+</html>
