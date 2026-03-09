@@ -123,6 +123,28 @@ h1 {
   margin-bottom: 20px;
 }
 
+.warmup-status {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eef5ff;
+  border: 1px solid #cfe3ff;
+  color: #214264;
+  font-weight: 700;
+}
+
+.warmup-status.success {
+  background: #e9fbef;
+  border-color: #beedcc;
+  color: #1e5b31;
+}
+
+.warmup-status.warn {
+  background: #fff4e6;
+  border-color: #ffd7ac;
+  color: #8f4c06;
+}
+
 .pricing ul {
   margin: 8px 0 0;
   padding-left: 18px;

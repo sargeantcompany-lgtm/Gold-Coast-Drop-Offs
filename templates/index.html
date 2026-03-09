@@ -46,6 +46,7 @@
         <li>Airport (Gold Coast to Brisbane): $60</li>
       </ul>
     </section>
+    <div id="warmupStatus" class="warmup-status" style="display:none"></div>
 
     <form id="bookingForm" class="grid">
       <label>Selected slot
@@ -125,11 +126,51 @@
     const pickupPlaceId = document.getElementById("pickupPlaceId");
     const dropoffPlaceId = document.getElementById("dropoffPlaceId");
     const mapsStatus = document.getElementById("mapsStatus");
+    const warmupStatus = document.getElementById("warmupStatus");
 
     let selectedSlot = "";
     let selectedSlotLabel = "";
     let currentDays = 14;
     let mapsReady = false;
+    let backendReady = false;
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function setWarmupStatus(message, kind = "info") {
+      if (!message) {
+        warmupStatus.style.display = "none";
+        warmupStatus.textContent = "";
+        warmupStatus.className = "warmup-status";
+        return;
+      }
+      warmupStatus.style.display = "block";
+      warmupStatus.textContent = message;
+      warmupStatus.className = `warmup-status ${kind}`;
+    }
+
+    async function warmupBackend() {
+      setWarmupStatus("Waking server... this can take up to 50 seconds on free hosting.");
+      for (let attempt = 1; attempt <= 6; attempt++) {
+        try {
+          const response = await fetch("/api/health", { cache: "no-store" });
+          if (response.ok) {
+            backendReady = true;
+            setWarmupStatus("Server is ready.", "success");
+            await sleep(1200);
+            setWarmupStatus("");
+            return true;
+          }
+        } catch {
+          // retry
+        }
+        setWarmupStatus(`Waking server... attempt ${attempt}/6`);
+        await sleep(8000);
+      }
+      setWarmupStatus("Server is still waking up. Please wait a moment and try again.", "warn");
+      return false;
+    }
 
     function setMapsStatus(message) {
       mapsStatus.textContent = message || "";
@@ -260,6 +301,9 @@
 
     async function loadAvailability(days) {
       resetMessages();
+      if (!backendReady) {
+        await warmupBackend();
+      }
       try {
         const response = await fetch(`/api/availability?days=${days}`);
         if (!response.ok) throw new Error("Failed to load availability.");
@@ -288,6 +332,15 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       resetMessages();
+
+      if (!backendReady) {
+        const ok = await warmupBackend();
+        if (!ok) {
+          errorBox.textContent = "Server is waking up. Please try again in a few seconds.";
+          errorBox.style.display = "block";
+          return;
+        }
+      }
 
       if (!preferredTime.value) {
         errorBox.textContent = "Please select an available slot from the calendar.";
@@ -332,7 +385,7 @@
     });
 
     loadPublicConfig();
-    loadAvailability(currentDays);
+    warmupBackend().finally(() => loadAvailability(currentDays));
   </script>
 </body>
 </html>
