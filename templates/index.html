@@ -18,34 +18,34 @@
         <p class="lead">Book online in under two minutes. We handle pickups, drop-offs and airport runs across the Gold Coast to Brisbane corridor.</p>
       </div>
       <div class="hero-image">
-        <img src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80" alt="Delivery worker carrying parcel to customer" />
+        <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=1200&q=80" alt="Courier delivering parcel at doorstep" />
       </div>
     </section>
 
-    <section class="photo-grid" aria-label="Delivery team photos">
+    <section class="photo-grid" aria-label="Service photos">
       <article class="photo-card">
-        <img src="https://images.unsplash.com/photo-1607082350899-7e105aa886ae?auto=format&fit=crop&w=900&q=80" alt="Driver loading delivery van" />
-        <p>Door-to-door local delivery</p>
+        <img src="https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?auto=format&fit=crop&w=900&q=80" alt="Delivery courier at Gold Coast doorstep" />
+        <p>$30 · Same-day Gold Coast delivery</p>
       </article>
       <article class="photo-card">
-        <img src="https://images.unsplash.com/photo-1529078155058-5d716f45d604?auto=format&fit=crop&w=900&q=80" alt="Delivery handoff to happy customer" />
-        <p>Friendly pickup and handoff</p>
+        <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e8f8?auto=format&fit=crop&w=900&q=80" alt="Driver ready for a local lift" />
+        <p>$60 · Direct same-day service</p>
       </article>
       <article class="photo-card">
-        <img src="https://images.unsplash.com/photo-1556740738-b6a63e27c4df?auto=format&fit=crop&w=900&q=80" alt="Courier preparing package list" />
-        <p>Reliable scheduled bookings</p>
+        <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=900&q=80" alt="Airport departure lounge for Brisbane transfer" />
+        <p>$60 · Gold Coast to Brisbane transfers</p>
       </article>
     </section>
 
     <section class="pricing">
       <strong>Pricing (AUD)</strong>
       <ul>
-        <li>Delivery within 4 hours: $30</li>
-        <li>Direct delivery: $60</li>
-        <li>Instant lift: $30</li>
-        <li>Airport (Gold Coast to Brisbane): $60</li>
+        <li>Anywhere in Gold Coast: $30</li>
+        <li>Direct (same day): $60</li>
+        <li>Gold Coast to Brisbane (same day): $60</li>
       </ul>
     </section>
+
     <div id="warmupStatus" class="warmup-status" style="display:none"></div>
 
     <form id="bookingForm" class="grid">
@@ -68,20 +68,21 @@
 
       <label>Service type
         <select name="service_type" required>
-          <option value="delivery_within_4h">Delivery (within 4 hours) - $30</option>
-          <option value="delivery_direct">Delivery (direct) - $60</option>
-          <option value="lift_instant">Instant lift - $30</option>
-          <option value="airport_gc_to_brisbane">Airport (Gold Coast to Brisbane) - $60</option>
+          <option value="gold_coast">Anywhere in Gold Coast — $30</option>
+          <option value="direct">Direct (same day) — $60</option>
+          <option value="gc_to_brisbane">Gold Coast to Brisbane (same day) — $60</option>
         </select>
       </label>
 
       <label>Pickup location
-        <input id="pickupLocation" name="pickup_location" required autocomplete="off" />
+        <div id="pickupACContainer"></div>
+        <input type="hidden" id="pickupLocation" name="pickup_location" />
       </label>
       <input type="hidden" id="pickupPlaceId" name="pickup_place_id" />
 
       <label>Dropoff location
-        <input id="dropoffLocation" name="dropoff_location" required autocomplete="off" />
+        <div id="dropoffACContainer"></div>
+        <input type="hidden" id="dropoffLocation" name="dropoff_location" />
       </label>
       <input type="hidden" id="dropoffPlaceId" name="dropoff_place_id" />
       <p id="mapsStatus" class="muted"></p>
@@ -121,8 +122,8 @@
     const bizPhone = document.getElementById("bizPhone");
     const days7Btn = document.getElementById("days7Btn");
     const days14Btn = document.getElementById("days14Btn");
-    const pickupInput = document.getElementById("pickupLocation");
-    const dropoffInput = document.getElementById("dropoffLocation");
+    const pickupLocation = document.getElementById("pickupLocation");
+    const dropoffLocation = document.getElementById("dropoffLocation");
     const pickupPlaceId = document.getElementById("pickupPlaceId");
     const dropoffPlaceId = document.getElementById("dropoffPlaceId");
     const mapsStatus = document.getElementById("mapsStatus");
@@ -133,6 +134,8 @@
     let currentDays = 14;
     let mapsReady = false;
     let backendReady = false;
+    let pickupAC = null;
+    let dropoffAC = null;
 
     function sleep(ms) {
       return new Promise((resolve) => setTimeout(resolve, ms));
@@ -202,7 +205,7 @@
         if (cfg.google_maps_api_key) {
           try {
             await loadGoogleMaps(cfg.google_maps_api_key);
-            setupAutocomplete();
+            await setupAutocomplete();
             setMapsStatus("Address autocomplete is active.");
           } catch (mapsError) {
             setMapsStatus(`Address autocomplete unavailable: ${mapsError.message}`);
@@ -216,7 +219,7 @@
     }
 
     function loadGoogleMaps(apiKey) {
-      if (window.google && window.google.maps && window.google.maps.places) {
+      if (window.google?.maps) {
         mapsReady = true;
         return Promise.resolve();
       }
@@ -224,47 +227,44 @@
         window.gm_authFailure = () => {
           reject(new Error("Google auth failure. Check billing, API key restrictions, and allowed referrers."));
         };
-        const script = document.createElement("script");
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-        script.async = true;
-        script.onload = () => {
+        window.__googleMapsCallback = () => {
           mapsReady = true;
           resolve();
         };
+        const script = document.createElement("script");
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&libraries=places&callback=__googleMapsCallback`;
+        script.async = true;
         script.onerror = () => reject(new Error("Failed to load Google Maps script. Check the API key and project billing."));
         document.head.appendChild(script);
       });
     }
 
-    function setupAutocomplete() {
+    async function setupAutocomplete() {
       if (!mapsReady) return;
-      if (!window.google || !window.google.maps || !window.google.maps.places) {
-        throw new Error("Google Places library not available. Enable Places API for this key.");
-      }
-      const opts = {
-        fields: ["formatted_address", "place_id", "name"],
-        componentRestrictions: { country: "au" },
-      };
-      const pickupAC = new google.maps.places.Autocomplete(pickupInput, opts);
-      const dropoffAC = new google.maps.places.Autocomplete(dropoffInput, opts);
+      const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
 
-      pickupAC.addListener("place_changed", () => {
-        const place = pickupAC.getPlace();
-        if (place.formatted_address) pickupInput.value = place.formatted_address;
-        pickupPlaceId.value = place.place_id || "";
-      });
-      dropoffAC.addListener("place_changed", () => {
-        const place = dropoffAC.getPlace();
-        if (place.formatted_address) dropoffInput.value = place.formatted_address;
-        dropoffPlaceId.value = place.place_id || "";
+      pickupAC = new PlaceAutocompleteElement({ componentRestrictions: { country: "au" } });
+      dropoffAC = new PlaceAutocompleteElement({ componentRestrictions: { country: "au" } });
+
+      document.getElementById("pickupACContainer").appendChild(pickupAC);
+      document.getElementById("dropoffACContainer").appendChild(dropoffAC);
+
+      pickupAC.addEventListener("gmp-placeselect", async (e) => {
+        const place = e.place;
+        await place.fetchFields({ fields: ["formattedAddress", "id"] });
+        pickupLocation.value = place.formattedAddress || "";
+        pickupPlaceId.value = place.id || "";
       });
 
-      pickupInput.addEventListener("input", () => {
-        pickupPlaceId.value = "";
+      dropoffAC.addEventListener("gmp-placeselect", async (e) => {
+        const place = e.place;
+        await place.fetchFields({ fields: ["formattedAddress", "id"] });
+        dropoffLocation.value = place.formattedAddress || "";
+        dropoffPlaceId.value = place.id || "";
       });
-      dropoffInput.addEventListener("input", () => {
-        dropoffPlaceId.value = "";
-      });
+
+      pickupAC.addEventListener("input", () => { pickupPlaceId.value = ""; });
+      dropoffAC.addEventListener("input", () => { dropoffPlaceId.value = ""; });
     }
 
     function renderCalendar(days) {
@@ -351,6 +351,22 @@
         return;
       }
 
+      // Sync typed text from autocomplete elements if no place was selected from dropdown
+      if (pickupAC && !pickupLocation.value) pickupLocation.value = pickupAC.value || "";
+      if (dropoffAC && !dropoffLocation.value) dropoffLocation.value = dropoffAC.value || "";
+
+      if (!pickupLocation.value.trim()) {
+        errorBox.textContent = "Please enter a pickup location.";
+        errorBox.style.display = "block";
+        return;
+      }
+
+      if (!dropoffLocation.value.trim()) {
+        errorBox.textContent = "Please enter a dropoff location.";
+        errorBox.style.display = "block";
+        return;
+      }
+
       submitBtn.disabled = true;
       submitBtn.textContent = "Submitting...";
 
@@ -377,6 +393,10 @@
         selectedSlotLabel = "";
         preferredTime.value = "";
         slotDisplay.value = "";
+        pickupLocation.value = "";
+        dropoffLocation.value = "";
+        pickupPlaceId.value = "";
+        dropoffPlaceId.value = "";
         await loadAvailability(currentDays);
       } catch (error) {
         errorBox.textContent = error.message || "Booking failed.";

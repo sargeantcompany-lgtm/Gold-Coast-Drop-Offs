@@ -300,6 +300,29 @@ button:disabled {
   margin: 0;
 }
 
+gmp-place-autocomplete {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+gmp-place-autocomplete::part(input) {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #c8d8ee;
+  border-radius: 10px;
+  font-family: Manrope, "Segoe UI", Arial, sans-serif;
+  font-size: 1rem;
+  color: var(--ink);
+  background: #fff;
+  box-sizing: border-box;
+}
+
+gmp-place-autocomplete::part(input):focus {
+  outline: 2px solid #b8d9ff;
+  border-color: #9fc9fb;
+}
+
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;

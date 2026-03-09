@@ -46,20 +46,18 @@ class Settings:
 
 settings = Settings()
 
-ServiceType = Literal["delivery_within_4h", "delivery_direct", "lift_instant", "airport_gc_to_brisbane"]
+ServiceType = Literal["gold_coast", "direct", "gc_to_brisbane"]
 
 PRICE_MAP: dict[ServiceType, int] = {
-    "delivery_within_4h": 30,
-    "delivery_direct": 60,
-    "lift_instant": 30,
-    "airport_gc_to_brisbane": 60,
+    "gold_coast": 30,
+    "direct": 60,
+    "gc_to_brisbane": 60,
 }
 
 SERVICE_LABELS: dict[ServiceType, str] = {
-    "delivery_within_4h": "Delivery (within 4 hours)",
-    "delivery_direct": "Delivery (direct)",
-    "lift_instant": "Instant lift",
-    "airport_gc_to_brisbane": "Airport lift (Gold Coast -> Brisbane)",
+    "gold_coast": "Anywhere in Gold Coast",
+    "direct": "Direct (same day)",
+    "gc_to_brisbane": "Gold Coast to Brisbane (same day)",
 }
 
 
