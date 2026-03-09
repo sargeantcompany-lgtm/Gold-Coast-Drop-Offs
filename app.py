@@ -55,9 +55,9 @@ PRICE_MAP: dict[ServiceType, int] = {
 }
 
 SERVICE_LABELS: dict[ServiceType, str] = {
-    "gold_coast": "Anywhere in Gold Coast",
-    "direct": "Direct (same day)",
-    "gc_to_brisbane": "Gold Coast to Brisbane (same day)",
+    "gold_coast": "Gold Coast local — same day (4 hrs / before 1pm → COB)",
+    "direct": "Direct now service — straight to destination",
+    "gc_to_brisbane": "Gold Coast to Brisbane — lift or delivery",
 }
 
 
