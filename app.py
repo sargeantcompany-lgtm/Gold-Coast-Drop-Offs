@@ -16,7 +16,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Literal
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import Request as UrllibRequest, urlopen
 
 import stripe
 from dotenv import load_dotenv
@@ -225,7 +225,7 @@ def _send_email_via_resend(to_address: str, subject: str, body: str) -> None:
             "text": body,
         }
     ).encode("utf-8")
-    request = Request(
+    request = UrllibRequest(
         "https://api.resend.com/emails",
         data=payload,
         headers={
