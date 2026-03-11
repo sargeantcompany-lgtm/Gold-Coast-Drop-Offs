@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import secrets
 import smtplib
@@ -30,6 +31,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
+logger = logging.getLogger("local_booking_site")
 
 BOOKINGS_FILE = BASE_DIR / "bookings.json"
 BOOKINGS_LOCK = Lock()
@@ -404,6 +406,7 @@ def _finalize_paid_booking(session_id: str, booking_id: str | None = None) -> tu
                 body,
             )
     except Exception as exc:
+        logger.exception("Failed to send paid booking confirmation email", extra={"booking_id": booking_snapshot.booking_id})
         _mark_confirmation_state(booking_snapshot.booking_id, "")
         return booking_snapshot, str(exc)
 
@@ -731,6 +734,10 @@ def create_booking(booking: BookingRequest) -> BookingResponse:
 async def create_checkout(booking: BookingRequest, request: Request):
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=500, detail="Payment not configured.")
+    try:
+        _assert_email_ready()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     requested = booking.preferred_time.replace(second=0, microsecond=0)
     if not _is_valid_slot(requested):
@@ -828,9 +835,17 @@ def booking_success(session_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     slot_label = booking.preferred_time.replace("T", " ")
+    message = f"Your booking is confirmed for {slot_label}. Reference: {booking.booking_id}. We'll be in touch soon."
+    if email_error:
+        logger.error("Payment succeeded but confirmation email failed", extra={"booking_id": booking.booking_id, "error": email_error})
+        contact = settings.business_email or settings.business_phone or settings.business_name
+        message = (
+            f"Your booking is confirmed for {slot_label}. Reference: {booking.booking_id}. "
+            f"Confirmation email could not be sent automatically. Please contact {contact}."
+        )
     return HTMLResponse(_success_page(
         "Payment successful!",
-        f"Your booking is confirmed for {slot_label}. Reference: {booking.booking_id}. We'll be in touch soon.",
+        message,
     ))
 
     with BOOKINGS_LOCK:
