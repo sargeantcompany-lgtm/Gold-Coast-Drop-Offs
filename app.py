@@ -257,6 +257,31 @@ def _send_email(to_address: str, subject: str, body: str) -> None:
 
 
 def _send_email_with_photo(to_address: str, subject: str, body: str, photo_data: bytes, photo_filename: str, content_type: str) -> None:
+    import base64
+    if settings.resend_api_key:
+        payload = json.dumps({
+            "from": settings.resend_from,
+            "to": [to_address],
+            "subject": subject,
+            "text": body,
+            "attachments": [{
+                "filename": photo_filename,
+                "content": base64.b64encode(photo_data).decode("utf-8"),
+            }],
+        }).encode("utf-8")
+        req = Request(
+            "https://api.resend.com/emails",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {settings.resend_api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urlopen(req, timeout=30):
+            pass
+        return
+
     msg = MIMEMultipart()
     msg["From"] = settings.smtp_from
     msg["To"] = to_address
@@ -801,14 +826,9 @@ def booking_success(session_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     slot_label = booking.preferred_time.replace("T", " ")
-    email_line = (
-        f"A confirmation email has been sent to {booking.email}."
-        if not email_error
-        else f"Payment is confirmed, but email delivery failed: {email_error}"
-    )
     return HTMLResponse(_success_page(
         "Payment successful!",
-        f"Your booking is confirmed for {slot_label}. Reference: {booking.booking_id}. {email_line}",
+        f"Your booking is confirmed for {slot_label}. Reference: {booking.booking_id}. We'll be in touch soon.",
     ))
 
     with BOOKINGS_LOCK:
