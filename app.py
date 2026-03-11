@@ -71,15 +71,15 @@ ServiceType = Literal["gold_coast", "direct", "gc_to_brisbane", "test_trip"]
 
 PRICE_MAP: dict[ServiceType, int] = {
     "gold_coast": 3000,
-    "direct": 6000,
+    "direct": 5000,
     "gc_to_brisbane": 6000,
     "test_trip": 50,
 }
 
 SERVICE_LABELS: dict[ServiceType, str] = {
-    "gold_coast": "Gold Coast local — same day (4 hrs / before 1pm → COB)",
-    "direct": "Direct now service — straight to destination",
-    "gc_to_brisbane": "Gold Coast to Brisbane — lift or delivery",
+    "gold_coast": "Same Day Within 4 Hours",
+    "direct": "Direct in 1 Hour",
+    "gc_to_brisbane": "Gold Coast to Brisbane 4 Hour Service",
     "test_trip": "Test trip - Stripe/email test",
 }
 
