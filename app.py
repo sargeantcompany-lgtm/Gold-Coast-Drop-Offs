@@ -35,6 +35,7 @@ BOOKINGS_FILE = BASE_DIR / "bookings.json"
 BOOKINGS_LOCK = Lock()
 SLOT_START_HOUR = 6
 SLOT_END_HOUR = 22  # exclusive
+SLOT_INTERVAL_MINUTES = 15
 
 
 @dataclass
@@ -42,7 +43,7 @@ class Settings:
     business_name: str = os.getenv("BUSINESS_NAME", "Local Lifts & Deliveries")
     business_phone: str = os.getenv("BUSINESS_PHONE", "0400 000 000")
     business_email: str = os.getenv("BUSINESS_EMAIL", "")
-    booking_window_days: int = int(os.getenv("BOOKING_WINDOW_DAYS", "14"))
+    booking_window_days: int = int(os.getenv("BOOKING_WINDOW_DAYS", "7"))
 
     smtp_host: str = os.getenv("SMTP_HOST", "")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
@@ -170,12 +171,12 @@ def _save_bookings(bookings: list[StoredBooking]) -> None:
 
 
 def _slot_key(dt: datetime) -> str:
-    return dt.replace(minute=0, second=0, microsecond=0).isoformat(timespec="minutes")
+    return dt.replace(second=0, microsecond=0).isoformat(timespec="minutes")
 
 
 def _is_valid_slot(dt: datetime) -> bool:
     now = datetime.now()
-    if dt.minute != 0:
+    if dt.minute % SLOT_INTERVAL_MINUTES != 0:
         return False
     if dt.hour < SLOT_START_HOUR or dt.hour >= SLOT_END_HOUR:
         return False
@@ -269,7 +270,7 @@ def _send_email_with_photo(to_address: str, subject: str, body: str, photo_data:
                 "content": base64.b64encode(photo_data).decode("utf-8"),
             }],
         }).encode("utf-8")
-        req = Request(
+        req = UrllibRequest(
             "https://api.resend.com/emails",
             data=payload,
             headers={
@@ -464,27 +465,28 @@ def _build_availability(days: int, bookings: list[StoredBooking]) -> list[Availa
         current_date = today + timedelta(days=offset)
         day_slots: list[AvailabilitySlot] = []
         for hour in range(SLOT_START_HOUR, SLOT_END_HOUR):
-            slot_dt = datetime(
-                year=current_date.year,
-                month=current_date.month,
-                day=current_date.day,
-                hour=hour,
-                minute=0,
-            )
-            key = _slot_key(slot_dt)
-            if slot_dt < now:
-                status = "past"
-            elif key in booked:
-                status = "booked"
-            else:
-                status = "available"
-            day_slots.append(
-                AvailabilitySlot(
-                    time=key,
-                    label=slot_dt.strftime("%I:%M %p").lstrip("0"),
-                    status=status,
+            for minute in range(0, 60, SLOT_INTERVAL_MINUTES):
+                slot_dt = datetime(
+                    year=current_date.year,
+                    month=current_date.month,
+                    day=current_date.day,
+                    hour=hour,
+                    minute=minute,
                 )
-            )
+                key = _slot_key(slot_dt)
+                if slot_dt < now:
+                    status = "past"
+                elif key in booked:
+                    status = "booked"
+                else:
+                    status = "available"
+                day_slots.append(
+                    AvailabilitySlot(
+                        time=key,
+                        label=slot_dt.strftime("%I:%M %p").lstrip("0"),
+                        status=status,
+                    )
+                )
         out.append(
             AvailabilityDay(
                 date=current_date.isoformat(),
@@ -653,7 +655,7 @@ def home() -> HTMLResponse:
 
 
 @app.get("/api/availability", response_model=AvailabilityResponse)
-def availability(days: int = Query(default=14, ge=7, le=14)) -> AvailabilityResponse:
+def availability(days: int = Query(default=7, ge=7, le=7)) -> AvailabilityResponse:
     with BOOKINGS_LOCK:
         bookings = _load_bookings()
     return AvailabilityResponse(days=_build_availability(days, bookings))

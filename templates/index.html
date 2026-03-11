@@ -112,13 +112,9 @@
 
     <section class="calendar-wrap">
       <div class="calendar-header">
-        <h2>Booking Calendar</h2>
-        <div class="day-toggle">
-          <button type="button" id="days7Btn">7 Days</button>
-          <button type="button" id="days14Btn" class="active">14 Days</button>
-        </div>
+        <h2>7-Day Booking Calendar</h2>
       </div>
-      <p class="muted">Available slots are shown below. Click a slot to book it.</p>
+      <p class="muted">Choose a date and a 15-minute pickup time within the next 7 days.</p>
       <div id="calendarGrid" class="calendar-grid"></div>
     </section>
 
@@ -138,8 +134,6 @@
     const errorBox = document.getElementById("error");
     const submitBtn = document.getElementById("submitBtn");
     const bizPhone = document.getElementById("bizPhone");
-    const days7Btn = document.getElementById("days7Btn");
-    const days14Btn = document.getElementById("days14Btn");
     const pickupLocation = document.getElementById("pickupLocation");
     const dropoffLocation = document.getElementById("dropoffLocation");
     const pickupPlaceId = document.getElementById("pickupPlaceId");
@@ -149,7 +143,7 @@
 
     let selectedSlot = "";
     let selectedSlotLabel = "";
-    let currentDays = 14;
+    let currentDays = 7;
     let mapsReady = false;
     let backendReady = false;
     let pickupAC = null;
@@ -344,20 +338,6 @@
         errorBox.style.display = "block";
       }
     }
-
-    days7Btn.addEventListener("click", () => {
-      currentDays = 7;
-      days7Btn.classList.add("active");
-      days14Btn.classList.remove("active");
-      loadAvailability(currentDays);
-    });
-
-    days14Btn.addEventListener("click", () => {
-      currentDays = 14;
-      days14Btn.classList.add("active");
-      days7Btn.classList.remove("active");
-      loadAvailability(currentDays);
-    });
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();

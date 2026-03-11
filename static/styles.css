@@ -248,23 +248,6 @@ button:disabled {
   gap: 12px;
 }
 
-.day-toggle {
-  display: flex;
-  gap: 8px;
-}
-
-.day-toggle button {
-  width: auto;
-  padding: 8px 12px;
-  background: #ffe5f5;
-  color: #7a1040;
-}
-
-.day-toggle button.active {
-  background: var(--brand-2);
-  color: #fff;
-}
-
 .calendar-grid {
   margin-top: 10px;
   display: grid;
@@ -277,6 +260,7 @@ button:disabled {
   border-radius: 10px;
   padding: 8px;
   background: #fff9fd;
+  min-height: 0;
 }
 
 .day-card h3 {
@@ -286,8 +270,11 @@ button:disabled {
 
 .slots-wrap {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .slot-btn {
@@ -401,6 +388,11 @@ gmp-place-autocomplete::part(input):focus {
   .calendar-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .slots-wrap {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-height: 300px;
   }
 
   /* Reduce float on mobile to avoid layout shift */
