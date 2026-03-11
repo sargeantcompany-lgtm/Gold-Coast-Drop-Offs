@@ -35,6 +35,31 @@ Open: `http://127.0.0.1:8010`
 
 This repo includes `render.yaml` with the same settings.
 
+## Deploy on Railway
+
+- Create one project from the GitHub repo for this app
+- Do not add Redis, Postgres, or storage for this project
+- Region: `Singapore`
+- Build command: `pip install -r requirements.txt`
+- Start command: `python -m uvicorn app:app --host 0.0.0.0 --port $PORT`
+
+Required environment variables:
+
+- `BUSINESS_NAME`
+- `BUSINESS_PHONE`
+- `BUSINESS_EMAIL`
+- `GOOGLE_MAPS_API_KEY`
+- `DRIVER_PASSWORD`
+- `SECRET_KEY`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_PUBLISHABLE_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+
+Email options:
+
+- Recommended on Railway: `RESEND_API_KEY`, `RESEND_FROM`
+- Or SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`
+
 ## Pricing Included
 
 - Delivery within 4 hours: AUD $30
