@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/pip install itsdangerous==2.2.0 -q)",
+      "Bash(.venv/Scripts/python -c \"import app; print\\(''app.py OK''\\)\")"
+    ]
+  }
+}
