@@ -7,7 +7,6 @@ import os
 import secrets
 import socket
 import smtplib
-import ssl
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from email.message import EmailMessage
@@ -235,16 +234,8 @@ def _open_smtp_connection() -> smtplib.SMTP:
         raise OSError(f"Could not resolve IPv4 address for SMTP host {host}")
 
     if settings.smtp_port == 465:
-        smtp = smtplib.SMTP_SSL(timeout=30)
-        smtp.sock = ssl.create_default_context().wrap_socket(
-            _connect_ipv4(settings.smtp_host, settings.smtp_port, 30),
-            server_hostname=settings.smtp_host,
-        )
-        smtp.file = None
-        smtp.helo_resp = None
-        smtp.ehlo_resp = None
-        smtp.esmtp_features = {}
-        smtp.does_esmtp = False
+        smtp = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=30)
+        smtp.ehlo()
     else:
         smtp = smtplib.SMTP(timeout=30)
         smtp.sock = _connect_ipv4(settings.smtp_host, settings.smtp_port, 30)
