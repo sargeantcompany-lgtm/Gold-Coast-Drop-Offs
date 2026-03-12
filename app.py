@@ -19,6 +19,7 @@ from threading import Lock
 from typing import Literal
 from urllib.parse import urlencode
 from urllib.request import urlopen
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import stripe
 from dotenv import load_dotenv
@@ -46,6 +47,7 @@ class Settings:
     business_name: str = os.getenv("BUSINESS_NAME", "Local Lifts & Deliveries")
     business_phone: str = os.getenv("BUSINESS_PHONE", "0400 000 000")
     business_email: str = os.getenv("BUSINESS_EMAIL", "")
+    business_timezone: str = os.getenv("BUSINESS_TIMEZONE", "Australia/Brisbane")
     booking_window_days: int = int(os.getenv("BOOKING_WINDOW_DAYS", "7"))
 
     smtp_host: str = os.getenv("SMTP_HOST", "")
@@ -201,6 +203,14 @@ def _format_contact_line(phone: str, whatsapp_number: str) -> str:
     if whatsapp_number:
         return f"Customer phone: {phone}\nCustomer WhatsApp: {whatsapp_number}\n"
     return f"Customer phone: {phone}\n"
+
+
+def _now_business_time() -> datetime:
+    try:
+        return datetime.now(ZoneInfo(settings.business_timezone))
+    except ZoneInfoNotFoundError:
+        logger.warning("Unknown business timezone; falling back to server local time", extra={"timezone": settings.business_timezone})
+        return datetime.now()
 
 
 def _assert_email_ready() -> None:
@@ -537,7 +547,7 @@ async def mark_pickup(
     if not driver_session or not _verify_session(driver_session):
         raise HTTPException(status_code=401, detail="Not authenticated.")
     photo_data = await photo.read()
-    now = datetime.now()
+    now = _now_business_time()
     now_str = now.isoformat(timespec="seconds")
     with BOOKINGS_LOCK:
         bookings = _load_bookings()
@@ -581,7 +591,7 @@ async def mark_dropoff(
     if not driver_session or not _verify_session(driver_session):
         raise HTTPException(status_code=401, detail="Not authenticated.")
     photo_data = await photo.read()
-    now = datetime.now()
+    now = _now_business_time()
     now_str = now.isoformat(timespec="seconds")
     duration_str = ""
     with BOOKINGS_LOCK:
