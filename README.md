@@ -15,7 +15,7 @@ Copy env values:
 Copy-Item .env.example .env
 ```
 
-Then update `.env` with your email + phone details. For hosted deployments, prefer `RESEND_API_KEY` and `RESEND_FROM` over raw SMTP.
+Then update `.env` with your email + phone details and SMTP credentials.
 
 ## Run
 
@@ -55,10 +55,13 @@ Required environment variables:
 - `STRIPE_PUBLISHABLE_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 
-Email options:
+Email settings:
 
-- Recommended on Railway: `RESEND_API_KEY`, `RESEND_FROM`
-- Or SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `SMTP_FROM`
 
 ## Pricing Included
 

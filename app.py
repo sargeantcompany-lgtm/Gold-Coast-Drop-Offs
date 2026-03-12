@@ -17,7 +17,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Literal
 from urllib.parse import urlencode
-from urllib.request import Request as UrllibRequest, urlopen
+from urllib.request import urlopen
 
 import stripe
 from dotenv import load_dotenv
@@ -52,8 +52,6 @@ class Settings:
     smtp_user: str = os.getenv("SMTP_USER", "")
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
     smtp_from: str = os.getenv("SMTP_FROM", "")
-    resend_api_key: str = os.getenv("RESEND_API_KEY", "")
-    resend_from: str = os.getenv("RESEND_FROM", "")
     google_maps_api_key: str = os.getenv("GOOGLE_MAPS_API_KEY", "")
     driver_password: str = os.getenv("DRIVER_PASSWORD", "")
     secret_key: str = os.getenv("SECRET_KEY", "dev-secret-change-me")
@@ -206,85 +204,40 @@ def _format_contact_line(phone: str, whatsapp_number: str) -> str:
 
 def _assert_email_ready() -> None:
     required = {"BUSINESS_EMAIL": settings.business_email}
-    if settings.resend_api_key:
-        required["RESEND_FROM"] = settings.resend_from
-    else:
-        required["SMTP_HOST"] = settings.smtp_host
-        required["SMTP_USER"] = settings.smtp_user
-        required["SMTP_PASSWORD"] = settings.smtp_password
-        required["SMTP_FROM"] = settings.smtp_from
+    required["SMTP_HOST"] = settings.smtp_host
+    required["SMTP_USER"] = settings.smtp_user
+    required["SMTP_PASSWORD"] = settings.smtp_password
+    required["SMTP_FROM"] = settings.smtp_from
     missing = [key for key, value in required.items() if not value]
     if missing:
         joined = ", ".join(missing)
         raise RuntimeError(f"Email is not configured. Missing: {joined}")
 
 
-def _send_email_via_resend(to_address: str, subject: str, body: str) -> None:
-    payload = json.dumps(
-        {
-            "from": settings.resend_from,
-            "to": [to_address],
-            "subject": subject,
-            "text": body,
-        }
-    ).encode("utf-8")
-    request = UrllibRequest(
-        "https://api.resend.com/emails",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {settings.resend_api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    with urlopen(request, timeout=30) as response:
-        if response.status >= 400:
-            raise RuntimeError(f"Resend request failed with status {response.status}")
+def _open_smtp_connection() -> smtplib.SMTP:
+    if settings.smtp_port == 465:
+        smtp = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=30)
+    else:
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30)
+        smtp.ehlo()
+        smtp.starttls()
+        smtp.ehlo()
+    smtp.login(settings.smtp_user, settings.smtp_password)
+    return smtp
 
 
 def _send_email(to_address: str, subject: str, body: str) -> None:
-    if settings.resend_api_key:
-        _send_email_via_resend(to_address, subject, body)
-        return
-
     message = EmailMessage()
     message["From"] = settings.smtp_from
     message["To"] = to_address
     message["Subject"] = subject
     message.set_content(body)
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
-        smtp.starttls()
-        smtp.login(settings.smtp_user, settings.smtp_password)
+    with _open_smtp_connection() as smtp:
         smtp.send_message(message)
 
 
 def _send_email_with_photo(to_address: str, subject: str, body: str, photo_data: bytes, photo_filename: str, content_type: str) -> None:
-    import base64
-    if settings.resend_api_key:
-        payload = json.dumps({
-            "from": settings.resend_from,
-            "to": [to_address],
-            "subject": subject,
-            "text": body,
-            "attachments": [{
-                "filename": photo_filename,
-                "content": base64.b64encode(photo_data).decode("utf-8"),
-            }],
-        }).encode("utf-8")
-        req = UrllibRequest(
-            "https://api.resend.com/emails",
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {settings.resend_api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        with urlopen(req, timeout=30):
-            pass
-        return
-
     msg = MIMEMultipart()
     msg["From"] = settings.smtp_from
     msg["To"] = to_address
@@ -296,9 +249,7 @@ def _send_email_with_photo(to_address: str, subject: str, body: str, photo_data:
     email_encoders.encode_base64(part)
     part.add_header("Content-Disposition", f'attachment; filename="{photo_filename}"')
     msg.attach(part)
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
-        smtp.starttls()
-        smtp.login(settings.smtp_user, settings.smtp_password)
+    with _open_smtp_connection() as smtp:
         smtp.sendmail(settings.smtp_from, to_address, msg.as_string())
 
 
@@ -962,7 +913,7 @@ def driver_test_email(driver_session: str | None = Cookie(default=None)) -> dict
 
     try:
         _assert_email_ready()
-        target = settings.business_email or settings.smtp_from or settings.resend_from
+        target = settings.business_email or settings.smtp_from
         if not target:
             raise RuntimeError("No target email is configured.")
         _send_email(
