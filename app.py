@@ -955,6 +955,32 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.post("/api/driver/test-email")
+def driver_test_email(driver_session: str | None = Cookie(default=None)) -> dict[str, str]:
+    if not driver_session or not _verify_session(driver_session):
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    try:
+        _assert_email_ready()
+        target = settings.business_email or settings.smtp_from or settings.resend_from
+        if not target:
+            raise RuntimeError("No target email is configured.")
+        _send_email(
+            target,
+            f"Railway email test - {settings.business_name}",
+            (
+                f"This is a live email transport test from Railway.\n\n"
+                f"Sent at: {datetime.now().isoformat(timespec='seconds')}\n"
+                f"Business: {settings.business_name}\n"
+                f"Target: {target}\n"
+            ),
+        )
+        return {"success": "true", "message": f"Test email sent to {target}"}
+    except Exception as exc:
+        logger.exception("Driver email test failed")
+        raise HTTPException(status_code=500, detail=f"Email test failed: {exc}") from exc
+
+
 @app.get("/api/public-config")
 def public_config() -> dict[str, object]:
     return {
