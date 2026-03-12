@@ -5,7 +5,9 @@ import json
 import logging
 import os
 import secrets
+import socket
 import smtplib
+import ssl
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from email.message import EmailMessage
@@ -215,10 +217,42 @@ def _assert_email_ready() -> None:
 
 
 def _open_smtp_connection() -> smtplib.SMTP:
+    def _connect_ipv4(host: str, port: int, timeout: float) -> socket.socket:
+        last_error: OSError | None = None
+        for family, socktype, proto, _, sockaddr in socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM):
+            sock: socket.socket | None = None
+            try:
+                sock = socket.socket(family, socktype, proto)
+                sock.settimeout(timeout)
+                sock.connect(sockaddr)
+                return sock
+            except OSError as exc:
+                last_error = exc
+                if sock is not None:
+                    sock.close()
+        if last_error is not None:
+            raise last_error
+        raise OSError(f"Could not resolve IPv4 address for SMTP host {host}")
+
     if settings.smtp_port == 465:
-        smtp = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=30)
+        smtp = smtplib.SMTP_SSL(timeout=30)
+        smtp.sock = ssl.create_default_context().wrap_socket(
+            _connect_ipv4(settings.smtp_host, settings.smtp_port, 30),
+            server_hostname=settings.smtp_host,
+        )
+        smtp.file = None
+        smtp.helo_resp = None
+        smtp.ehlo_resp = None
+        smtp.esmtp_features = {}
+        smtp.does_esmtp = False
     else:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30)
+        smtp = smtplib.SMTP(timeout=30)
+        smtp.sock = _connect_ipv4(settings.smtp_host, settings.smtp_port, 30)
+        smtp.file = None
+        smtp.helo_resp = None
+        smtp.ehlo_resp = None
+        smtp.esmtp_features = {}
+        smtp.does_esmtp = False
         smtp.ehlo()
         smtp.starttls()
         smtp.ehlo()
