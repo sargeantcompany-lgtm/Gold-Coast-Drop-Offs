@@ -199,6 +199,117 @@
     .chip-pickup .chip-num { color: var(--brand-2); }
     .chip-delivered .chip-num { color: #1a8a45; }
 
+    .schedule-panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 20px;
+    }
+
+    .schedule-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .schedule-head h2 {
+      font-family: Sora, Manrope, Arial, sans-serif;
+      font-size: 17px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .schedule-head p {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .schedule-status {
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .slot-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .legend-chip {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      border: 1px solid transparent;
+    }
+
+    .legend-available {
+      background: #eef6ff;
+      border-color: #c4dcfb;
+      color: #12519a;
+    }
+
+    .legend-blocked {
+      background: #fff3e8;
+      border-color: #ffd3a8;
+      color: #8a4300;
+    }
+
+    .legend-booked {
+      background: #f4f6f8;
+      border-color: #d6dde7;
+      color: #65788c;
+    }
+
+    .driver-slots-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .driver-slot {
+      border: 1px solid #c8d8ee;
+      border-radius: 10px;
+      padding: 10px 6px;
+      background: #fff;
+      font: inherit;
+      font-weight: 800;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.12s, transform 0.08s;
+    }
+
+    .driver-slot:hover {
+      transform: translateY(-1px);
+    }
+
+    .driver-slot.available {
+      background: #eef6ff;
+      border-color: #c4dcfb;
+      color: #12519a;
+    }
+
+    .driver-slot.blocked {
+      background: #fff3e8;
+      border-color: #ffd3a8;
+      color: #8a4300;
+    }
+
+    .driver-slot.booked,
+    .driver-slot.past {
+      background: #f4f6f8;
+      border-color: #d6dde7;
+      color: #8a97a6;
+      cursor: not-allowed;
+    }
+
     /* ── Section heading ── */
     .day-heading {
       display: flex;
@@ -595,6 +706,10 @@
       .card-time {
         font-size: 17px;
       }
+
+      .driver-slots-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
     }
 
     /* Prevent default button styles from the global sheet */
@@ -648,6 +763,22 @@
         </div>
       </div>
 
+      <section class="schedule-panel">
+        <div class="schedule-head">
+          <div>
+            <h2>Block Times</h2>
+            <p>Tap an open slot to block it. Tap a blocked slot to open it again.</p>
+          </div>
+          <div id="scheduleStatus" class="schedule-status"></div>
+        </div>
+        <div class="slot-legend">
+          <span class="legend-chip legend-available">Available</span>
+          <span class="legend-chip legend-blocked">Blocked by driver</span>
+          <span class="legend-chip legend-booked">Booked or unavailable</span>
+        </div>
+        <div id="driverCalendar"></div>
+      </section>
+
       <!-- Day heading -->
       <div class="day-heading">
         <h2 id="dayHeadingText">Today</h2>
@@ -666,6 +797,7 @@
   <script>
     // ── State ──────────────────────────────────────────────────────────────
     let allBookings = [];
+    let availabilityDays = [];
     let currentDate = todayString();
     let pendingAction = null; // { bookingId, type: 'pickup'|'dropoff', cardEl }
 
@@ -752,6 +884,14 @@
       }
     }
 
+    async function loadDriverSchedule() {
+      const res = await fetch("/api/availability?days=7");
+      if (!res.ok) throw new Error("Failed to load availability.");
+      const data = await res.json();
+      availabilityDays = data.days || [];
+      renderDriverCalendar();
+    }
+
     // ── Filter and sort for selected date ─────────────────────────────────
     function getBookingsForDate(dateStr) {
       return allBookings
@@ -791,6 +931,64 @@
 
       for (const booking of dayBookings) {
         list.appendChild(buildCard(booking));
+      }
+
+      renderDriverCalendar();
+    }
+
+    function renderDriverCalendar() {
+      const root = document.getElementById("driverCalendar");
+      const status = document.getElementById("scheduleStatus");
+      root.innerHTML = "";
+      status.textContent = "";
+
+      const day = availabilityDays.find((item) => item.date === currentDate);
+      if (!day) {
+        root.innerHTML = `<div class="empty-state"><p>Blocking is available for the next 7 days only.</p></div>`;
+        return;
+      }
+
+      const grid = document.createElement("div");
+      grid.className = "driver-slots-grid";
+
+      for (const slot of day.slots) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `driver-slot ${slot.status}`;
+        btn.textContent = slot.label;
+
+        if (slot.status === "available") {
+          btn.title = "Block this slot";
+          btn.addEventListener("click", () => updateDriverSlot(slot.time, true));
+        } else if (slot.status === "blocked") {
+          btn.title = "Unblock this slot";
+          btn.addEventListener("click", () => updateDriverSlot(slot.time, false));
+        } else {
+          btn.disabled = true;
+        }
+        grid.appendChild(btn);
+      }
+
+      root.appendChild(grid);
+    }
+
+    async function updateDriverSlot(slotTime, shouldBlock) {
+      const status = document.getElementById("scheduleStatus");
+      status.textContent = shouldBlock ? "Blocking slot..." : "Opening slot...";
+      try {
+        const res = await fetch(shouldBlock ? "/api/driver/block-slot" : "/api/driver/unblock-slot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slot: slotTime }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || "Failed to update slot.");
+        }
+        status.textContent = shouldBlock ? "Slot blocked." : "Slot opened.";
+        await loadDriverSchedule();
+      } catch (err) {
+        status.textContent = err.message || "Failed to update slot.";
       }
     }
 
@@ -1044,8 +1242,16 @@
     }
 
     // ── Init ───────────────────────────────────────────────────────────────
-    loadConfig();
-    loadBookings();
+    async function initDashboard() {
+      await loadConfig();
+      try {
+        await Promise.all([loadBookings(), loadDriverSchedule()]);
+      } catch {
+        // loadBookings already renders a visible error state if it fails.
+      }
+    }
+
+    initDashboard();
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/static/sw.js").catch(() => {});

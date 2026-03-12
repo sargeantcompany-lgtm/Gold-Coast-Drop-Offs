@@ -56,6 +56,47 @@
 
     <div id="warmupStatus" class="warmup-status" style="display:none"></div>
 
+    <section class="contact-panel">
+      <div class="contact-copy">
+        <p class="eyebrow">Questions or custom offers</p>
+        <h2>Contact us for a custom price between two destinations.</h2>
+        <p class="lead">Use this section if you have a question, need a special route, or want to offer an amount for a trip that is not listed above.</p>
+      </div>
+      <form id="contactForm" class="grid contact-form">
+        <label>Your name
+          <input name="full_name" required />
+        </label>
+
+        <label>Email
+          <input type="email" name="email" required />
+        </label>
+
+        <label>Phone number (optional)
+          <input name="phone" />
+        </label>
+
+        <label>From destination (optional)
+          <input name="pickup_location" />
+        </label>
+
+        <label>To destination (optional)
+          <input name="dropoff_location" />
+        </label>
+
+        <label>Your offer amount (optional)
+          <input name="offer_amount" placeholder="Example: 45 AUD" />
+        </label>
+
+        <label>Your question or request
+          <textarea name="message" rows="4" required></textarea>
+        </label>
+
+        <button type="submit" id="contactSubmitBtn">Send Message</button>
+        <div id="contactResult" class="result" style="display:none"></div>
+        <div id="contactError" class="error" style="display:none"></div>
+      </form>
+    </section>
+
     <form id="bookingForm" class="grid">
       <label>Selected slot
         <input id="slotDisplay" readonly placeholder="👇 Tap to pick a slot from the calendar below" style="cursor:pointer" />
@@ -127,6 +168,7 @@
   <script>
     const form = document.getElementById("bookingForm");
     const calendarGrid = document.getElementById("calendarGrid");
+    const contactForm = document.getElementById("contactForm");
     const preferredTime = document.getElementById("preferredTime");
     const slotDisplay = document.getElementById("slotDisplay");
     const slotBanner = document.getElementById("slotBanner");
@@ -134,6 +176,9 @@
     const errorBox = document.getElementById("error");
     const submitBtn = document.getElementById("submitBtn");
     const bizPhone = document.getElementById("bizPhone");
+    const contactResult = document.getElementById("contactResult");
+    const contactError = document.getElementById("contactError");
+    const contactSubmitBtn = document.getElementById("contactSubmitBtn");
     const pickupLocation = document.getElementById("pickupLocation");
     const dropoffLocation = document.getElementById("dropoffLocation");
     const pickupPlaceId = document.getElementById("pickupPlaceId");
@@ -194,6 +239,11 @@
     function resetMessages() {
       result.style.display = "none";
       errorBox.style.display = "none";
+    }
+
+    function resetContactMessages() {
+      contactResult.style.display = "none";
+      contactError.style.display = "none";
     }
 
     slotDisplay.addEventListener("click", () => {
@@ -311,7 +361,11 @@
 
           if (slot.status !== "available") {
             btn.disabled = true;
-            btn.classList.add(slot.status === "booked" ? "booked" : "past");
+            btn.classList.add(
+              slot.status === "booked" ? "booked" :
+              slot.status === "blocked" ? "blocked" :
+              "past"
+            );
           } else {
             const label = `${day.label} ${slot.label}`;
             btn.addEventListener("click", () => setSelectedSlot(slot.time, label));
@@ -400,6 +454,40 @@
         errorBox.style.display = "block";
         submitBtn.disabled = false;
         submitBtn.textContent = "Book & Pay Now";
+      }
+    });
+
+    contactForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      resetContactMessages();
+
+      contactSubmitBtn.disabled = true;
+      contactSubmitBtn.textContent = "Sending...";
+
+      const payload = Object.fromEntries(new FormData(contactForm).entries());
+
+      try {
+        const response = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.detail || "Message failed");
+        }
+
+        const data = await response.json();
+        contactResult.textContent = data.message || "Message sent.";
+        contactResult.style.display = "block";
+        contactForm.reset();
+      } catch (error) {
+        contactError.textContent = error.message || "Message failed.";
+        contactError.style.display = "block";
+      } finally {
+        contactSubmitBtn.disabled = false;
+        contactSubmitBtn.textContent = "Send Message";
       }
     });
 

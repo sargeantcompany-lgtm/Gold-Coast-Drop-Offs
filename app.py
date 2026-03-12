@@ -36,6 +36,7 @@ load_dotenv(BASE_DIR / ".env")
 logger = logging.getLogger("local_booking_site")
 
 BOOKINGS_FILE = BASE_DIR / "bookings.json"
+BLOCKED_SLOTS_FILE = BASE_DIR / "blocked_slots.json"
 BOOKINGS_LOCK = Lock()
 SLOT_START_HOUR = 6
 SLOT_END_HOUR = 22  # exclusive
@@ -109,7 +110,7 @@ class BookingResponse(BaseModel):
 class AvailabilitySlot(BaseModel):
     time: str
     label: str
-    status: Literal["available", "booked", "past"]
+    status: Literal["available", "booked", "blocked", "past"]
 
 
 class AvailabilityDay(BaseModel):
@@ -120,6 +121,30 @@ class AvailabilityDay(BaseModel):
 
 class AvailabilityResponse(BaseModel):
     days: list[AvailabilityDay]
+
+
+class ContactRequest(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=120)
+    email: EmailStr
+    phone: str = Field(default="", max_length=30)
+    pickup_location: str = Field(default="", max_length=250)
+    dropoff_location: str = Field(default="", max_length=250)
+    offer_amount: str = Field(default="", max_length=40)
+    message: str = Field(..., min_length=5, max_length=1200)
+
+
+class ContactResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class DriverSlotBlockRequest(BaseModel):
+    slot: datetime
+
+
+class DriverSlotBlockResponse(BaseModel):
+    success: bool
+    blocked_slots: list[str]
 
 
 @dataclass
@@ -173,6 +198,22 @@ def _save_bookings(bookings: list[StoredBooking]) -> None:
     BOOKINGS_FILE.write_text(json.dumps([asdict(b) for b in bookings], indent=2), encoding="utf-8")
 
 
+def _load_blocked_slots() -> list[str]:
+    if not BLOCKED_SLOTS_FILE.exists():
+        return []
+    raw = BLOCKED_SLOTS_FILE.read_text(encoding="utf-8")
+    if not raw.strip():
+        return []
+    data = json.loads(raw)
+    if not isinstance(data, list):
+        return []
+    return sorted({str(item) for item in data if isinstance(item, str)})
+
+
+def _save_blocked_slots(slots: list[str]) -> None:
+    BLOCKED_SLOTS_FILE.write_text(json.dumps(sorted(set(slots)), indent=2), encoding="utf-8")
+
+
 def _slot_key(dt: datetime) -> str:
     return dt.replace(second=0, microsecond=0).isoformat(timespec="minutes")
 
@@ -193,6 +234,10 @@ def _is_valid_slot(dt: datetime) -> bool:
 
 def _booked_slot_keys(bookings: list[StoredBooking]) -> set[str]:
     return {b.preferred_time for b in bookings if b.payment_status == "paid"}
+
+
+def _blocked_slot_keys() -> set[str]:
+    return set(_load_blocked_slots())
 
 
 def _format_aud(cents: int) -> str:
@@ -444,7 +489,7 @@ def _normalize_address(address: str, place_id: str | None) -> str:
     raise HTTPException(status_code=400, detail=f"Address could not be confirmed by Google Maps (status: {status}).")
 
 
-def _build_availability(days: int, bookings: list[StoredBooking]) -> list[AvailabilityDay]:
+def _build_availability(days: int, bookings: list[StoredBooking], blocked_slots: set[str]) -> list[AvailabilityDay]:
     now = datetime.now()
     today = now.date()
     booked = _booked_slot_keys(bookings)
@@ -467,6 +512,8 @@ def _build_availability(days: int, bookings: list[StoredBooking]) -> list[Availa
                     status = "past"
                 elif key in booked:
                     status = "booked"
+                elif key in blocked_slots:
+                    status = "blocked"
                 else:
                     status = "available"
                 day_slots.append(
@@ -536,6 +583,52 @@ def driver_bookings(driver_session: str | None = Cookie(default=None)):
     with BOOKINGS_LOCK:
         bookings = _load_bookings()
     return {"bookings": [asdict(b) for b in bookings]}
+
+
+@app.get("/api/driver/blocked-slots", response_model=DriverSlotBlockResponse)
+def driver_blocked_slots(driver_session: str | None = Cookie(default=None)) -> DriverSlotBlockResponse:
+    if not driver_session or not _verify_session(driver_session):
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    with BOOKINGS_LOCK:
+        blocked_slots = _load_blocked_slots()
+    return DriverSlotBlockResponse(success=True, blocked_slots=blocked_slots)
+
+
+@app.post("/api/driver/block-slot", response_model=DriverSlotBlockResponse)
+def driver_block_slot(
+    payload: DriverSlotBlockRequest,
+    driver_session: str | None = Cookie(default=None),
+) -> DriverSlotBlockResponse:
+    if not driver_session or not _verify_session(driver_session):
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    requested = payload.slot.replace(second=0, microsecond=0)
+    if not _is_valid_slot(requested):
+        raise HTTPException(status_code=400, detail="Selected slot is invalid. Choose a future 15-minute slot.")
+    key = _slot_key(requested)
+    with BOOKINGS_LOCK:
+        bookings = _load_bookings()
+        if key in _booked_slot_keys(bookings):
+            raise HTTPException(status_code=409, detail="This slot already has a paid booking.")
+        blocked_slots = _load_blocked_slots()
+        if key not in blocked_slots:
+            blocked_slots.append(key)
+            _save_blocked_slots(blocked_slots)
+        return DriverSlotBlockResponse(success=True, blocked_slots=sorted(set(blocked_slots)))
+
+
+@app.post("/api/driver/unblock-slot", response_model=DriverSlotBlockResponse)
+def driver_unblock_slot(
+    payload: DriverSlotBlockRequest,
+    driver_session: str | None = Cookie(default=None),
+) -> DriverSlotBlockResponse:
+    if not driver_session or not _verify_session(driver_session):
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    requested = payload.slot.replace(second=0, microsecond=0)
+    key = _slot_key(requested)
+    with BOOKINGS_LOCK:
+        blocked_slots = [slot for slot in _load_blocked_slots() if slot != key]
+        _save_blocked_slots(blocked_slots)
+    return DriverSlotBlockResponse(success=True, blocked_slots=blocked_slots)
 
 
 @app.post("/api/driver/pickup/{booking_id}")
@@ -647,7 +740,8 @@ def home() -> HTMLResponse:
 def availability(days: int = Query(default=7, ge=7, le=7)) -> AvailabilityResponse:
     with BOOKINGS_LOCK:
         bookings = _load_bookings()
-    return AvailabilityResponse(days=_build_availability(days, bookings))
+        blocked_slots = _blocked_slot_keys()
+    return AvailabilityResponse(days=_build_availability(days, bookings, blocked_slots))
 
 
 @app.post("/api/bookings", response_model=BookingResponse)
@@ -668,8 +762,9 @@ def create_booking(booking: BookingRequest) -> BookingResponse:
 
     with BOOKINGS_LOCK:
         bookings = _load_bookings()
-        if key in _booked_slot_keys(bookings):
-            raise HTTPException(status_code=409, detail="Selected slot is already booked. Please choose another slot.")
+        blocked_slots = _blocked_slot_keys()
+        if key in _booked_slot_keys(bookings) or key in blocked_slots:
+            raise HTTPException(status_code=409, detail="Selected slot is unavailable. Please choose another slot.")
 
         booking_id = hashlib.md5(f"{datetime.now().isoformat()}{booking.email}".encode()).hexdigest()[:12]
         stored = StoredBooking(
@@ -736,8 +831,9 @@ async def create_checkout(booking: BookingRequest, request: Request):
 
     with BOOKINGS_LOCK:
         bookings = _load_bookings()
-        if key in _booked_slot_keys(bookings):
-            raise HTTPException(status_code=409, detail="Selected slot is already booked. Please choose another slot.")
+        blocked_slots = _blocked_slot_keys()
+        if key in _booked_slot_keys(bookings) or key in blocked_slots:
+            raise HTTPException(status_code=409, detail="Selected slot is unavailable. Please choose another slot.")
 
         booking_id = hashlib.md5(f"{datetime.now().isoformat()}{booking.email}".encode()).hexdigest()[:12]
         stored = StoredBooking(
@@ -942,6 +1038,53 @@ def _success_page(title: str, message: str, is_cancel: bool = False) -> str:
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/contact", response_model=ContactResponse)
+def send_contact_message(payload: ContactRequest) -> ContactResponse:
+    try:
+        _assert_email_ready()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    offer_line = payload.offer_amount.strip() or "-"
+    pickup_line = payload.pickup_location.strip() or "-"
+    dropoff_line = payload.dropoff_location.strip() or "-"
+    phone_line = payload.phone.strip() or "-"
+    body = (
+        f"Contact request - {settings.business_name}\n\n"
+        f"Name: {payload.full_name}\n"
+        f"Email: {payload.email}\n"
+        f"Phone: {phone_line}\n"
+        f"Pickup: {pickup_line}\n"
+        f"Dropoff: {dropoff_line}\n"
+        f"Offer amount: {offer_line}\n\n"
+        f"Message:\n{payload.message}\n"
+    )
+    try:
+        _send_email(
+            settings.business_email,
+            f"Contact / offer request - {payload.full_name}",
+            body,
+        )
+        _send_email(
+            str(payload.email),
+            f"We received your message - {settings.business_name}",
+            (
+                f"Hi {payload.full_name},\n\n"
+                f"We received your message and will get back to you soon.\n\n"
+                f"Pickup: {pickup_line}\n"
+                f"Dropoff: {dropoff_line}\n"
+                f"Offer amount: {offer_line}\n\n"
+                f"Your message:\n{payload.message}\n\n"
+                f"Phone: {settings.business_phone}\n"
+                f"Email: {settings.business_email}\n"
+            ),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to send message: {exc}") from exc
+
+    return ContactResponse(success=True, message="Thanks. Your message has been sent.")
 
 
 @app.post("/api/driver/test-email")

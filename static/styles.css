@@ -187,6 +187,28 @@ h1 {
   padding-left: 18px;
 }
 
+.contact-panel {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 18px;
+  background: linear-gradient(135deg, #fff7ec, #fff0f7);
+  border: 1px solid #f1d7bd;
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+
+.contact-copy {
+  align-self: start;
+}
+
+.contact-form {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid #f2dfe9;
+  border-radius: 14px;
+  padding: 14px;
+}
+
 /* ── Form ─────────────────────────────────────────────────────────── */
 .grid {
   display: grid;
@@ -303,6 +325,12 @@ button:disabled {
   border-color: #ddd;
 }
 
+.slot-btn.blocked {
+  background: #fff4e7;
+  color: #9a5400;
+  border-color: #ffc88a;
+}
+
 .slot-btn.past {
   background: #f8f8f8;
   color: #aaa;
@@ -370,6 +398,10 @@ gmp-place-autocomplete::part(input):focus {
   }
 
   .photo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-panel {
     grid-template-columns: 1fr;
   }
 
