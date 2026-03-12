@@ -821,7 +821,10 @@ def booking_success(session_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     slot_label = booking.preferred_time.replace("T", " ")
-    message = f"Your booking is confirmed for {slot_label}. Reference: {booking.booking_id}. We'll be in touch soon."
+    message = (
+        f"Your booking is confirmed for {slot_label}. Reference: {booking.booking_id}. "
+        f"A confirmation email has been sent to {booking.email}."
+    )
     if email_error:
         logger.error("Payment succeeded but confirmation email failed", extra={"booking_id": booking.booking_id, "error": email_error})
         contact = settings.business_email or settings.business_phone or settings.business_name
