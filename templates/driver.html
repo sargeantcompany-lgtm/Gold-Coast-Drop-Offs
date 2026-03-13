@@ -268,16 +268,45 @@
       color: #65788c;
     }
 
-    .driver-slots-grid {
+    .driver-calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .driver-day-card {
+      border: 1px solid #d9e6f7;
+      border-radius: 10px;
+      padding: 8px;
+      background: #f9fbff;
+      min-height: 0;
+    }
+
+    .driver-day-card.active {
+      border-color: #ffcf9e;
+      box-shadow: 0 0 0 2px rgba(255, 122, 26, 0.12);
+    }
+
+    .driver-day-card h3 {
+      margin: 4px 0 10px;
+      font-size: 16px;
+      font-weight: 800;
+      font-family: Sora, Manrope, Arial, sans-serif;
+    }
+
+    .driver-slots-wrap {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 8px;
+      gap: 6px;
+      max-height: 360px;
+      overflow-y: auto;
+      padding-right: 2px;
     }
 
     .driver-slot {
       border: 1px solid #c8d8ee;
       border-radius: 10px;
-      padding: 10px 6px;
+      padding: 7px 6px;
       background: #fff;
       font: inherit;
       font-weight: 800;
@@ -707,8 +736,9 @@
         font-size: 17px;
       }
 
-      .driver-slots-grid {
+      .driver-slots-wrap {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        max-height: 300px;
       }
     }
 
@@ -921,6 +951,7 @@
       list.innerHTML = "";
 
       if (dayBookings.length === 0) {
+        renderDriverCalendar();
         list.innerHTML = `
           <div class="empty-state">
             <div class="empty-icon">📭</div>
@@ -940,33 +971,49 @@
       const root = document.getElementById("driverCalendar");
       const status = document.getElementById("scheduleStatus");
       root.innerHTML = "";
-      status.textContent = "";
+      if (!status.dataset.message) {
+        status.textContent = "";
+      }
 
-      const day = availabilityDays.find((item) => item.date === currentDate);
-      if (!day) {
+      if (!availabilityDays.length) {
         root.innerHTML = `<div class="empty-state"><p>Blocking is available for the next 7 days only.</p></div>`;
         return;
       }
 
       const grid = document.createElement("div");
-      grid.className = "driver-slots-grid";
+      grid.className = "driver-calendar-grid";
 
-      for (const slot of day.slots) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `driver-slot ${slot.status}`;
-        btn.textContent = slot.label;
+      for (const day of availabilityDays) {
+        const dayCard = document.createElement("div");
+        dayCard.className = `driver-day-card${day.date === currentDate ? " active" : ""}`;
 
-        if (slot.status === "available") {
-          btn.title = "Block this slot";
-          btn.addEventListener("click", () => updateDriverSlot(slot.time, true));
-        } else if (slot.status === "blocked") {
-          btn.title = "Unblock this slot";
-          btn.addEventListener("click", () => updateDriverSlot(slot.time, false));
-        } else {
-          btn.disabled = true;
+        const title = document.createElement("h3");
+        title.textContent = day.label;
+        dayCard.appendChild(title);
+
+        const slotsWrap = document.createElement("div");
+        slotsWrap.className = "driver-slots-wrap";
+
+        for (const slot of day.slots) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = `driver-slot ${slot.status}`;
+          btn.textContent = slot.label;
+
+          if (slot.status === "available") {
+            btn.title = "Block this slot";
+            btn.addEventListener("click", () => updateDriverSlot(slot.time, true));
+          } else if (slot.status === "blocked") {
+            btn.title = "Unblock this slot";
+            btn.addEventListener("click", () => updateDriverSlot(slot.time, false));
+          } else {
+            btn.disabled = true;
+          }
+          slotsWrap.appendChild(btn);
         }
-        grid.appendChild(btn);
+
+        dayCard.appendChild(slotsWrap);
+        grid.appendChild(dayCard);
       }
 
       root.appendChild(grid);
@@ -974,6 +1021,7 @@
 
     async function updateDriverSlot(slotTime, shouldBlock) {
       const status = document.getElementById("scheduleStatus");
+      status.dataset.message = "1";
       status.textContent = shouldBlock ? "Blocking slot..." : "Opening slot...";
       try {
         const res = await fetch(shouldBlock ? "/api/driver/block-slot" : "/api/driver/unblock-slot", {
