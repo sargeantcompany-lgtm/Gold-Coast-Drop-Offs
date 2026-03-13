@@ -78,6 +78,33 @@ h1 {
   line-height: 1.65;
 }
 
+.hero-actions {
+  margin-top: 18px;
+}
+
+.quick-link,
+.calendar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #f0c4e4;
+  color: #7a1040;
+  font-weight: 800;
+  text-decoration: none;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.quick-link:hover,
+.calendar-link:hover {
+  background: #fff6fb;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(233, 30, 140, 0.14);
+}
+
 .hero-image img {
   width: 100%;
   height: 100%;
@@ -420,6 +447,11 @@ gmp-place-autocomplete::part(input):focus {
   .calendar-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .quick-link,
+  .calendar-link {
+    width: 100%;
   }
 
   .slots-wrap {

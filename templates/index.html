@@ -23,6 +23,9 @@
         <p class="eyebrow">Gold Coast same-day support</p>
         <h1>Fast local deliveries with real people you can trust.</h1>
         <p class="lead">Book online in under two minutes. We use a passenger car — up to 4 people, or packages up to 100&nbsp;kg (under 20&nbsp;kg each, boot-fit only). Same-day Gold Coast runs and Gold Coast to Brisbane lifts or deliveries.</p>
+        <div class="hero-actions">
+          <a class="quick-link" href="#contactSection">Questions or make an offer</a>
+        </div>
       </div>
       <div class="hero-image">
         <img src="/static/img-lifts.png" alt="Driver welcoming passengers to car" />
@@ -55,47 +58,6 @@
     </section>
 
     <div id="warmupStatus" class="warmup-status" style="display:none"></div>
-
-    <section class="contact-panel">
-      <div class="contact-copy">
-        <p class="eyebrow">Questions or custom offers</p>
-        <h2>Contact us for a custom price between two destinations.</h2>
-        <p class="lead">Use this section if you have a question, need a special route, or want to offer an amount for a trip that is not listed above.</p>
-      </div>
-      <form id="contactForm" class="grid contact-form">
-        <label>Your name
-          <input name="full_name" required />
-        </label>
-
-        <label>Email
-          <input type="email" name="email" required />
-        </label>
-
-        <label>Phone number (optional)
-          <input name="phone" />
-        </label>
-
-        <label>From destination (optional)
-          <input name="pickup_location" />
-        </label>
-
-        <label>To destination (optional)
-          <input name="dropoff_location" />
-        </label>
-
-        <label>Your offer amount (optional)
-          <input name="offer_amount" placeholder="Example: 45 AUD" />
-        </label>
-
-        <label>Your question or request
-          <textarea name="message" rows="4" required></textarea>
-        </label>
-
-        <button type="submit" id="contactSubmitBtn">Send Message</button>
-        <div id="contactResult" class="result" style="display:none"></div>
-        <div id="contactError" class="error" style="display:none"></div>
-      </form>
-    </section>
 
     <form id="bookingForm" class="grid">
       <label>Selected slot
@@ -154,9 +116,51 @@
     <section class="calendar-wrap">
       <div class="calendar-header">
         <h2>7-Day Booking Calendar</h2>
+        <a class="calendar-link" href="#contactSection">Need a custom quote?</a>
       </div>
       <p class="muted">Choose a date and a 15-minute pickup time within the next 7 days.</p>
       <div id="calendarGrid" class="calendar-grid"></div>
+    </section>
+
+    <section id="contactSection" class="contact-panel">
+      <div class="contact-copy">
+        <p class="eyebrow">Questions or custom offers</p>
+        <h2>Contact us for a custom price between two destinations.</h2>
+        <p class="lead">Use this section if you have a question, need a special route, or want to offer an amount for a trip that is not listed above.</p>
+      </div>
+      <form id="contactForm" class="grid contact-form">
+        <label>Your name
+          <input name="full_name" required />
+        </label>
+
+        <label>Email
+          <input type="email" name="email" required />
+        </label>
+
+        <label>Phone number (optional)
+          <input name="phone" />
+        </label>
+
+        <label>From destination (optional)
+          <input name="pickup_location" />
+        </label>
+
+        <label>To destination (optional)
+          <input name="dropoff_location" />
+        </label>
+
+        <label>Your offer amount (optional)
+          <input name="offer_amount" placeholder="Example: 45 AUD" />
+        </label>
+
+        <label>Your question or request
+          <textarea name="message" rows="4" required></textarea>
+        </label>
+
+        <button type="submit" id="contactSubmitBtn">Send Message</button>
+        <div id="contactResult" class="result" style="display:none"></div>
+        <div id="contactError" class="error" style="display:none"></div>
+      </form>
     </section>
 
     <div id="result" class="result" style="display:none"></div>
