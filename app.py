@@ -82,7 +82,7 @@ SERVICE_LABELS: dict[ServiceType, str] = {
     "gold_coast": "Same Day Within 4 Hours",
     "direct": "Direct in 1 Hour",
     "gc_to_brisbane": "Gold Coast to Brisbane 4 Hour Service",
-    "test_trip": "Test trip - Stripe/email test",
+    "test_trip": "Admin test - Stripe/email test",
 }
 
 
