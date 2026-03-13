@@ -359,7 +359,7 @@ def _build_email_body(booking: BookingRequest, price_cents: int) -> str:
         f"Booking reference: pending payment confirmation\n"
         f"Booked slot: {booking.preferred_time.strftime('%Y-%m-%d %H:%M')}\n"
         f"Notes: {booking.notes or '-'}\n\n"
-        f"Business phone: {settings.business_phone}\n"
+        f"Adam your drivers number 0407739919\n"
         f"Business email: {settings.business_email}\n"
     )
 
@@ -379,7 +379,7 @@ def _build_paid_email_body(booking: StoredBooking) -> str:
         f"Booked slot: {booking.preferred_time.replace('T', ' ')}\n"
         f"Notes: {booking.notes or '-'}\n\n"
         f"We have your booking and will contact you if anything changes.\n"
-        f"Business phone: {settings.business_phone}\n"
+        f"Adam your drivers number 0407739919\n"
         f"Business email: {settings.business_email}\n"
     )
 
@@ -660,7 +660,7 @@ async def mark_pickup(
         f"From: {booking.pickup_location}\n"
         f"To: {booking.dropoff_location}\n\n"
         f"Photo proof of pickup is attached.\n\n"
-        f"Questions? Call us: {settings.business_phone}\n"
+        f"Adam your drivers number 0407739919\n"
         f"{settings.business_name}"
     )
     try:
@@ -716,7 +716,7 @@ async def mark_dropoff(
         + (f"Trip duration: {duration_str}\n" if duration_str else "")
         + f"\nPhoto proof of delivery is attached.\n\n"
         f"Thank you for using {settings.business_name}!\n"
-        f"Questions? Call us: {settings.business_phone}"
+        f"Adam your drivers number 0407739919"
     )
     try:
         _send_email_with_photo(
@@ -957,7 +957,7 @@ def booking_success(session_id: str):
                     f"Dropoff: {booking.dropoff_location}\n"
                     f"Booked slot: {booking.preferred_time}\n"
                     f"Notes: {booking.notes or '-'}\n\n"
-                    f"Business phone: {settings.business_phone}\n"
+                    f"Adam your drivers number 0407739919\n"
                 )
                 if settings.smtp_host:
                     _send_email(booking.email, f"Booking Confirmed — {settings.business_name}", body)
@@ -1077,7 +1077,7 @@ def send_contact_message(payload: ContactRequest) -> ContactResponse:
                 f"Dropoff: {dropoff_line}\n"
                 f"Offer amount: {offer_line}\n\n"
                 f"Your message:\n{payload.message}\n\n"
-                f"Phone: {settings.business_phone}\n"
+                f"Adam your drivers number 0407739919\n"
                 f"Email: {settings.business_email}\n"
             ),
         )
